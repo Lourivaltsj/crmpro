@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="pt-pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRM Pro - Gestão de Crédito</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; }
+        .tab-active { background-color: #10b981; color: white; box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.2); }
+        .hidden { display: none !important; }
+        .login-gradient { background: linear-gradient(135deg, #064e3b 0%, #022c22 100%); }
+        
+        input:disabled, select:disabled {
+            background-color: #f1f5f9;
+            cursor: not-allowed;
+            color: #94a3b8;
+        }
+
+        @media print {
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            body { background: white; }
+            main { padding: 0 !important; }
+            .bg-slate-50, .bg-emerald-50, .bg-blue-50, .bg-amber-50, .bg-purple-50 { background-color: white !important; border: 1px solid #e2e8f0; }
+        }
+    </style>
+</head>
+<body class="bg-slate-50">
+    <!-- TELA DE LOGIN -->
+    <div id="login-screen" class="fixed inset-0 z-[100] login-gradient flex items-center justify-center p-4">
+        <div id="login-card" class="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden p-10">
+            <div class="text-center mb-10">
+                <div class="inline-block p-5 bg-emerald-50 rounded-3xl mb-4 text-4xl">🔐</div>
+                <h2 class="text-3xl font-extrabold text-slate-800 tracking-tight">CRM Vendas</h2>
+                <p class="text-slate-400 text-sm font-semibold uppercase tracking-widest mt-2">Acesso Restrito</p>
+            </div>
+            <form id="form-login" class="space-y-5">
+                <div>
+                    <label class="block text-[11px] font-extrabold text-slate-400 uppercase mb-2 ml-1">Utilizador</label>
+                    <select id="login-vendedor" class="w-full border-2 border-slate-100 p-4 rounded-2xl bg-slate-50 outline-none focus:border-emerald-500 font-bold text-slate-700" required></select>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-extrabold text-slate-400 uppercase mb-2 ml-1">Senha</label>
+                    <input type="password" id="login-senha" placeholder="••••" class="w-full border-2 border-slate-100 p-4 rounded-2xl bg-slate-50 outline-none focus:border-emerald-500 text-center text-2xl tracking-[0.5em]" required>
+                </div>
+                <div id="login-error" class="hidden text-red-500 text-[10px] font-black uppercase text-center bg-red-50 py-2 rounded-lg">Dados incorretos!</div>
+                <button type="submit" class="w-full bg-emerald-600 text-white py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-emerald-200 hover:bg-emerald-700 transition-all active:scale-[0.98]">Entrar</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- APP PRINCIPAL -->
+    <div id="app" class="min-h-screen flex flex-col hidden">
+        <header class="bg-white border-b border-slate-200 p-6 no-print">
+            <div class="container mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+                <div class="flex items-center gap-6">
+                    <h1 class="text-2xl font-black italic text-emerald-600 tracking-tighter">CRM<span class="text-slate-800">PRO</span></h1>
+                    <div class="hidden md:block h-10 w-[1px] bg-slate-200"></div>
+                    <div>
+                        <p class="text-[10px] font-black text-slate-400 uppercase leading-none mb-1">Perfil Ativo</p>
+                        <p id="user-logged-name" class="font-bold text-slate-800 uppercase text-sm leading-none">---</p>
+                        <p id="user-logged-level" class="text-[9px] font-black text-emerald-500 uppercase mt-1"></p>
+                    </div>
+                </div>
+                <button onclick="logout()" class="bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-600 px-6 py-3 rounded-2xl text-xs font-black uppercase transition-all">Sair</button>
+                <button onclick="openChangePasswordModal()" class="bg-slate-100 hover:bg-slate-200 text-slate-600 px-6 py-3 rounded-2xl text-xs font-black uppercase transition-all">Alterar Senha</button>
+            </div>
+        </header>
+
+        <main class="container mx-auto p-4 md:p-8 flex-grow">
+            <nav class="flex flex-wrap gap-2 mb-10 bg-white p-2 rounded-[2rem] shadow-sm border border-slate-100 inline-flex no-print">
+                <button onclick="switchTab('clientes')" id="tab-clientes" class="px-8 py-3 rounded-[1.5rem] tab-active uppercase text-[11px] font-black tracking-widest transition-all">Clientes</button>
+                <button onclick="switchTab('vendedores')" id="tab-vendedores" class="px-8 py-3 rounded-[1.5rem] uppercase text-[11px] font-black tracking-widest transition-all">Equipe</button>
+                <button onclick="switchTab('relatorios')" id="tab-relatorios" class="px-8 py-3 rounded-[1.5rem] uppercase text-[11px] font-black tracking-widest transition-all">Relatórios</button>
+            </nav>
+
+            <!-- SEÇÃO CLIENTES -->
+            <div id="section-clientes" class="tab-content">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+                    <h2 class="text-2xl font-extrabold text-slate-800">Gestão de Clientes</h2>
+                    <div class="flex gap-2">
+                        <input type="text" id="search-cliente" oninput="render()" placeholder="Buscar cliente..." class="bg-white border border-slate-200 px-6 py-4 rounded-2xl outline-none focus:border-emerald-500 transition-all font-semibold text-sm">
+                        <button onclick="prepareCreateClient()" class="bg-emerald-600 text-white px-8 py-4 rounded-2xl font-black shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all">+ Novo Cadastro</button>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="lista-clientes"></div>
+            </div>
+
+            <!-- SEÇÃO EQUIPE -->
+            <div id="section-vendedores" class="tab-content hidden">
+                <div class="flex justify-between items-center mb-8">
+                    <h2 class="text-2xl font-extrabold text-slate-800">Equipe</h2>
+                    <button id="btn-novo-vendedor" onclick="openModal('modal-vendedor')" class="bg-slate-800 text-white px-8 py-4 rounded-2xl font-black shadow-lg hover:bg-black transition-all">+ Novo Vendedor</button>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="grid-vendedores"></div>
+            </div>
+
+            <!-- SEÇÃO RELATÓRIOS -->
+            <div id="section-relatorios" class="tab-content hidden">
+                <div class="bg-white p-6 md:p-10 rounded-[2.5rem] md:rounded-[3rem] shadow-sm border border-slate-100">
+                    
+                    <!-- BOTÕES DE IMPORTAR / EXPORTAR (ADICIONADOS) -->
+                    <div class="no-print flex justify-end gap-3 mb-6">
+                        <button onclick="exportarDados()" class="text-[10px] font-black uppercase tracking-widest bg-blue-50 text-blue-600 px-4 py-2 rounded-xl hover:bg-blue-600 hover:text-white transition-all flex items-center gap-2">
+                            <span>💾</span> Exportar Backup
+                        </button>
+                        <button onclick="document.getElementById('input-import').click()" class="text-[10px] font-black uppercase tracking-widest bg-amber-50 text-amber-600 px-4 py-2 rounded-xl hover:bg-amber-600 hover:text-white transition-all flex items-center gap-2">
+                            <span>📂</span> Importar Backup
+                        </button>
+                        <input type="file" id="input-import" class="hidden" accept=".json" onchange="importarDados(event)">
+                    </div>
+
+                    <!-- FILTRO DE PERÍODO -->
+                    <div class="no-print bg-slate-50 p-6 rounded-[2rem] border border-slate-100 mb-10">
+                        <div class="flex flex-col md:flex-row items-end gap-4">
+                            <div class="flex-grow">
+                                <label class="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-1">Data Inicial</label>
+                                <input type="date" id="filtro-data-inicio" class="w-full p-4 rounded-2xl border-0 outline-none font-bold text-slate-700 bg-white">
+                            </div>
+                            <div class="flex-grow">
+                                <label class="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-1">Data Final</label>
+                                <input type="date" id="filtro-data-fim" class="w-full p-4 rounded-2xl border-0 outline-none font-bold text-slate-700 bg-white">
+                            </div>
+                            <button onclick="renderRelatorios()" class="bg-emerald-600 text-white px-10 py-4 rounded-2xl font-black uppercase text-[11px] tracking-widest hover:bg-emerald-700 shadow-lg shadow-emerald-100 transition-all">Filtrar Período</button>
+                            <button onclick="limparFiltroRelatorio()" class="bg-slate-200 text-slate-600 px-6 py-4 rounded-2xl font-black uppercase text-[11px] hover:bg-slate-300 transition-all">Limpar</button>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
+                        <div>
+                            <h2 class="text-3xl font-black text-slate-800">Relatório Consolidado</h2>
+                            <p id="txt-periodo-relatorio" class="text-emerald-500 font-bold uppercase text-[10px] tracking-widest">Exibindo: Todo o período</p>
+                        </div>
+                        <button onclick="window.print()" class="bg-slate-100 p-4 rounded-2xl font-black uppercase text-[11px] hover:bg-slate-200 transition-all flex items-center gap-2 no-print">
+                            <span>🖨️</span> Imprimir Relatório
+                        </button>
+                    </div>
+
+                    <!-- DASHBOARD PRINCIPAL DE VENDAS POR MODO -->
+                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-10">
+                        <div class="bg-slate-50 p-5 rounded-[1.5rem] border border-slate-100">
+                            <p class="text-[8px] font-black text-slate-400 uppercase mb-1">PIX</p>
+                            <h3 id="rep-v-pix" class="text-sm font-black text-slate-800">R$ 0,00</h3>
+                        </div>
+                        <div class="bg-slate-50 p-5 rounded-[1.5rem] border border-slate-100">
+                            <p class="text-[8px] font-black text-slate-400 uppercase mb-1">Dinheiro</p>
+                            <h3 id="rep-v-din" class="text-sm font-black text-slate-800">R$ 0,00</h3>
+                        </div>
+                        <div class="bg-slate-50 p-5 rounded-[1.5rem] border border-slate-100">
+                            <p class="text-[8px] font-black text-slate-400 uppercase mb-1">Débito</p>
+                            <h3 id="rep-v-deb" class="text-sm font-black text-slate-800">R$ 0,00</h3>
+                        </div>
+                        <div class="bg-slate-50 p-5 rounded-[1.5rem] border border-slate-100">
+                            <p class="text-[8px] font-black text-slate-400 uppercase mb-1">Crédito</p>
+                            <h3 id="rep-v-cre" class="text-sm font-black text-slate-800">R$ 0,00</h3>
+                        </div>
+                        <div class="bg-red-50 p-5 rounded-[1.5rem] border border-red-100">
+                            <p class="text-[8px] font-black text-red-600 uppercase mb-1">Crediário</p>
+                            <h3 id="rep-v-crediario" class="text-sm font-black text-red-900">R$ 0,00</h3>
+                        </div>
+                        <div class="bg-emerald-50 p-5 rounded-[1.5rem] border border-emerald-100">
+                            <p class="text-[8px] font-black text-emerald-600 uppercase mb-1">Rec. Crediário</p>
+                            <h3 id="rep-rec-crediario" class="text-sm font-black text-emerald-900">R$ 0,00</h3>
+                        </div>
+                    </div>
+
+                    <!-- TOTALIZADORES GERAIS -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
+                        <div class="bg-slate-800 p-6 rounded-[2rem] text-white">
+                            <p class="text-[9px] font-black text-slate-400 uppercase mb-1">Faturamento Bruto (Vendas)</p>
+                            <h3 id="rep-total-faturado" class="text-2xl font-black">R$ 0,00</h3>
+                        </div>
+                        <div class="bg-emerald-600 p-6 rounded-[2rem] text-white">
+                            <p class="text-[9px] font-black text-emerald-200 uppercase mb-1">Total Efetivamente Recebido</p>
+                            <h3 id="rep-total-recebido" class="text-2xl font-black">R$ 0,00</h3>
+                        </div>
+                        <div class="bg-amber-500 p-6 rounded-[2rem] text-white">
+                            <p class="text-[9px] font-black text-amber-100 uppercase mb-1">Saldo em Aberto (No Período)</p>
+                            <h3 id="rep-total-saldo" class="text-2xl font-black">R$ 0,00</h3>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <!-- VENDAS POR VENDEDOR -->
+                        <div>
+                            <h4 class="text-sm font-black text-slate-800 uppercase mb-4 ml-2">Total de Vendas por Vendedor</h4>
+                            <div class="bg-slate-50 rounded-[2rem] overflow-hidden border border-slate-100">
+                                <table class="w-full text-left">
+                                    <thead class="bg-slate-100">
+                                        <tr>
+                                            <th class="p-6 text-[10px] font-black uppercase text-slate-500">Vendedor</th>
+                                            <th class="p-6 text-right text-[10px] font-black uppercase text-slate-500">Valor Vendido</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="table-rank-vendedores" class="divide-y divide-slate-100"></tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- MAIORES DEVEDORES -->
+                        <div>
+                            <h4 class="text-sm font-black text-slate-800 uppercase mb-4 ml-2">Saldos de Clientes (Geral)</h4>
+                            <div class="bg-slate-50 rounded-[2rem] overflow-hidden border border-slate-100">
+                                <table class="w-full text-left">
+                                    <thead class="bg-slate-100">
+                                        <tr>
+                                            <th class="p-6 text-[10px] font-black uppercase text-slate-500">Cliente</th>
+                                            <th class="p-6 text-right text-[10px] font-black uppercase text-slate-500">Saldo</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="table-rank-devedores" class="divide-y divide-slate-100"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- MODAIS (Inalterados) -->
+        <div id="modal-detalhes" class="fixed inset-0 bg-slate-900/60 hidden flex items-center justify-center p-4 backdrop-blur-sm z-40 no-print">
+            <div class="bg-white rounded-[3rem] w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+                <div class="bg-slate-800 p-8 text-white flex justify-between items-center">
+                    <div>
+                        <div class="flex items-center gap-4">
+                            <h3 id="det-nome-cli" class="text-2xl font-black uppercase tracking-tight"></h3>
+                            <button id="btn-editar-dados-ficha" onclick="prepareEditClientFromDetails()" class="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all">Editar Cadastro</button>
+                            <button onclick="imprimirTransacoesCliente()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1">
+                                <span>🖨️</span> Imprimir Transações
+                            </button>
+                        </div>
+                        <p id="det-info-contato" class="text-xs text-slate-400 font-bold mt-1"></p>
+                    </div>
+                    <button onclick="closeModal('modal-detalhes')" class="text-3xl">&times;</button>
+                </div>
+                <div class="p-8 overflow-y-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
+                    <div class="lg:col-span-4 space-y-6">
+                        <div class="bg-slate-50 p-8 rounded-[2rem] border border-slate-100">
+                            <div class="flex justify-between items-center mb-6">
+                                <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Crédito Disponível</h4>
+                                <span class="bg-blue-100 text-blue-600 text-[8px] font-black px-2 py-1 rounded">CREDIÁRIO</span>
+                            </div>
+                            <div class="mb-4">
+                                <div class="flex justify-between text-xs font-bold mb-2">
+                                    <span class="text-slate-500">Uso do Limite</span>
+                                    <span id="txt-limite-percent" class="text-emerald-600">0%</span>
+                                </div>
+                                <div class="w-full bg-slate-200 h-3 rounded-full overflow-hidden">
+                                    <div id="bar-limite" class="bg-emerald-500 h-full transition-all duration-500" style="width: 0%"></div>
+                                </div>
+                            </div>
+                            <div class="space-y-3">
+                                <div class="flex justify-between p-4 bg-white rounded-2xl shadow-sm border border-slate-100">
+                                    <span class="text-[10px] font-black text-slate-400 uppercase">Limite Total</span>
+                                    <span id="txt-limite-total" class="font-black text-slate-800">R$ 0,00</span>
+                                </div>
+                                <div class="flex justify-between p-4 bg-white rounded-2xl shadow-sm border border-slate-100">
+                                    <span class="text-[10px] font-black text-slate-400 uppercase">Aberto</span>
+                                    <span id="txt-limite-aberto" class="font-black text-red-500">R$ 0,00</span>
+                                </div>
+                                <div class="flex justify-between p-4 bg-white rounded-2xl shadow-sm border border-slate-100">
+                                    <span class="text-[10px] font-black text-slate-400 uppercase">Disponível</span>
+                                    <span id="txt-limite-disponivel" class="font-black text-emerald-600">R$ 0,00</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm">
+                            <h4 class="text-[10px] font-black text-emerald-600 uppercase mb-4 tracking-widest">📝 Novo Lançamento</h4>
+                            <form id="form-movimentacao" class="space-y-3">
+                                <select name="tipo_geral" id="select-tipo-geral" class="w-full p-4 rounded-2xl bg-slate-50 border-0 outline-none font-bold text-slate-700" onchange="toggleFormMode(this.value)">
+                                    <option value="VENDA">Lançar Venda</option>
+                                    <option value="RECEBIMENTO">Lançar Recebimento</option>
+                                </select>
+                                <div id="campos-venda" class="space-y-3">
+                                    <select name="forma_venda" id="field-forma-venda" class="w-full p-4 rounded-2xl border border-slate-100 outline-none font-bold text-emerald-600 bg-white">
+                                        <option value="V_PIX">Venda (PIX) - À Vista</option>
+                                        <option value="V_DIN">Venda (Dinheiro) - À Vista</option>
+                                        <option value="V_DEB">Venda (Débito) - À Vista</option>
+                                        <option value="V_CRE">Venda (Crédito) - À Vista</option>
+                                        <option value="V_CREDIARIO">Venda (CREDIÁRIO) - Usa Limite</option>
+                                    </select>
+                                    <input type="text" name="item" id="field-item" placeholder="Produto / Serviço" class="w-full p-4 rounded-2xl border border-slate-100 outline-none">
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <input type="number" name="qtd" id="field-qtd" placeholder="Qtd" value="" step="0.01" class="w-full p-4 rounded-2xl border border-slate-100 outline-none font-bold" oninput="calcularTotal()">
+                                        <input type="number" name="v_unit" id="field-v-unit" placeholder="Valor Unitário (R$)" step="0.01" class="w-full p-4 rounded-2xl border border-slate-100 outline-none font-bold" oninput="calcularTotal()">
+                                    </div>
+                                    <div class="flex justify-between p-4 bg-emerald-50 rounded-2xl border border-emerald-200">
+                                        <span class="text-[10px] font-black text-emerald-600 uppercase">Total Calculado</span>
+                                        <span id="txt-total-calculado" class="font-black text-emerald-600 text-lg">R$ 0,00</span>
+                                    </div>
+                                </div>
+                                <div id="campos-recebimento" class="hidden space-y-3">
+                                    <input type="text" name="rec_referencia" placeholder="Ref. Recebimento" class="w-full p-4 rounded-2xl border border-slate-100 outline-none">
+                                    <input type="number" name="rec_valor" placeholder="Valor R$" step="0.01" class="w-full p-4 rounded-2xl border border-slate-100 outline-none font-black text-emerald-600 text-lg">
+                                    <select name="rec_vendedor" id="select-vendedor-recebimento" class="w-full p-4 rounded-2xl border border-slate-100 outline-none font-bold text-slate-700 bg-white"></select>
+                                </div>
+                                <input type="date" name="data" required class="w-full p-4 rounded-2xl border border-slate-100 data-hoje outline-none font-bold text-slate-500">
+                                <button type="submit" class="w-full bg-emerald-600 text-white py-5 rounded-2xl font-black uppercase text-[11px] tracking-widest hover:bg-emerald-700 shadow-lg shadow-emerald-100 transition-all">Confirmar Registro</button>
+                            </form>
+                        </div>
+                    </div>
+                    <div class="lg:col-span-8">
+                        <div class="bg-white border-2 border-slate-50 rounded-[2.5rem] overflow-hidden">
+                            <table class="w-full text-sm">
+                                <thead class="bg-slate-50 border-b">
+                                    <tr>
+                                        <th class="p-5 text-left text-[10px] font-black text-slate-400 uppercase">Data</th>
+                                        <th class="p-5 text-left text-[10px] font-black text-slate-400 uppercase">Descrição / Modo</th>
+                                        <th class="p-5 text-left text-[10px] font-black text-slate-400 uppercase">Vendedor</th>
+                                        <th class="p-5 text-right text-[10px] font-black text-slate-400 uppercase">Valor</th>
+                                        <th class="p-5 text-center text-[10px] font-black text-slate-400 uppercase">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="lista-extrato" class="divide-y divide-slate-50"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL ALTERAR SENHA -->
+        <div id="modal-senha" class="fixed inset-0 bg-slate-900/80 hidden flex items-center justify-center p-4 backdrop-blur-md z-50 no-print">
+            <div class="bg-white rounded-[2.5rem] w-full max-w-md shadow-2xl overflow-hidden">
+                <div class="bg-slate-800 p-8 text-white flex justify-between items-center">
+                    <h3 class="font-black uppercase tracking-widest">Alterar Senha</h3>
+                    <button onclick="closeModal('modal-senha')" class="text-3xl">&times;</button>
+                </div>
+                <form id="form-change-password" class="p-8 space-y-4">
+                    <div>
+                        <label class="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-1">Senha Atual</label>
+                        <input type="password" name="current_senha" required class="w-full border-2 border-slate-100 p-4 rounded-2xl outline-none focus:border-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-1">Nova Senha</label>
+                        <input type="password" name="new_senha" required class="w-full border-2 border-slate-100 p-4 rounded-2xl outline-none focus:border-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-1">Confirmar Nova Senha</label>
+                        <input type="password" name="confirm_senha" required class="w-full border-2 border-slate-100 p-4 rounded-2xl outline-none focus:border-emerald-500">
+                    </div>
+                    <div id="change-password-error" class="hidden text-red-600 text-xs font-black uppercase bg-red-50 p-3 rounded-lg"></div>
+                    <button type="submit" class="w-full bg-emerald-600 text-white py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl hover:bg-emerald-700 transition-all">Atualizar Senha</button>
+                </form>
+            </div>
+        </div>
+        <!-- MODAL EDITAR / CADASTRAR CLIENTE -->
+        <div id="modal-cliente" class="fixed inset-0 bg-slate-900/80 hidden flex items-center justify-center p-4 backdrop-blur-md z-50 no-print">
+            <div class="bg-white rounded-[2.5rem] w-full max-w-2xl shadow-2xl overflow-hidden">
+                <div class="bg-emerald-600 p-8 text-white flex justify-between items-center">
+                    <h3 id="modal-cliente-title" class="font-black uppercase tracking-widest">Dados do Cliente</h3>
+                    <button onclick="closeModal('modal-cliente')" class="text-3xl">&times;</button>
+                </div>
+                <form id="form-cliente" class="p-10 grid grid-cols-1 md:grid-cols-2 gap-6 bg-white">
+                    <input type="hidden" name="id" id="edit-client-id">
+                    <div class="md:col-span-2">
+                        <label class="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-1">Nome Completo</label>
+                        <input type="text" name="nome" id="edit-client-nome" required class="w-full border-2 border-slate-100 p-4 rounded-2xl outline-none focus:border-emerald-500 font-bold field-lvl-1">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-1">CPF/CNPJ</label>
+                        <input type="text" name="cpf" id="edit-client-cpf" class="w-full border-2 border-slate-100 p-4 rounded-2xl outline-none field-lvl-1">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-1">Telefone</label>
+                        <input type="text" name="telefone" id="edit-client-telefone" class="w-full border-2 border-slate-100 p-4 rounded-2xl outline-none field-lvl-2">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-1">Endereço</label>
+                        <input type="text" name="endereco" id="edit-client-endereco" class="w-full border-2 border-slate-100 p-4 rounded-2xl outline-none field-lvl-2">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-1">Referência</label>
+                        <input type="text" name="referencia" id="edit-client-referencia" class="w-full border-2 border-slate-100 p-4 rounded-2xl outline-none field-lvl-2">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-1">Limite para Crediário (R$)</label>
+                        <input type="number" name="limite" id="edit-client-limite" step="0.01" required class="w-full border-2 border-slate-100 p-5 rounded-2xl outline-none font-black text-emerald-600 text-2xl field-lvl-1">
+                    </div>
+                    <div class="md:col-span-2 mt-4 flex gap-3">
+                        <button type="button" id="btn-excluir-cliente" class="hidden bg-red-50 text-red-600 px-6 py-5 rounded-2xl font-black uppercase text-[11px] tracking-widest hover:bg-red-100 transition-all">Excluir Cadastro</button>
+                        <button type="submit" id="btn-salvar-cliente" class="flex-grow bg-emerald-600 text-white py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-emerald-100 hover:brightness-110">Gravar Dados</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- MODAL NOVO VENDEDOR -->
+        <div id="modal-vendedor" class="fixed inset-0 bg-slate-900/80 hidden flex items-center justify-center p-4 backdrop-blur-md z-50 no-print">
+            <div class="bg-white rounded-[2.5rem] w-full max-w-md shadow-2xl overflow-hidden">
+                <div class="bg-slate-800 p-8 text-white flex justify-between items-center">
+                    <h3 class="font-black uppercase tracking-widest">Cadastrar Operador</h3>
+                    <button onclick="closeModal('modal-vendedor')" class="text-3xl">&times;</button>
+                </div>
+                <form id="form-vendedor" class="p-8 space-y-4">
+                    <div>
+                        <label class="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-1">Nome</label>
+                        <input type="text" name="nome" required class="w-full border-2 border-slate-100 p-4 rounded-2xl outline-none focus:border-emerald-500 font-bold">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-1">Senha</label>
+                        <input type="password" name="senha" required class="w-full border-2 border-slate-100 p-4 rounded-2xl outline-none focus:border-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-1">Hierarquia</label>
+                        <select name="nivel" class="w-full border-2 border-slate-100 p-4 rounded-2xl outline-none bg-slate-50 font-bold">
+                            <option value="1">Nível 1 (Admin)</option>
+                            <option value="2">Nível 2 (Gerente)</option>
+                            <option value="3" selected>Nível 3 (Vendedor)</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="w-full bg-emerald-600 text-white py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl hover:bg-emerald-700 transition-all mt-4">Salvar</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // CONFIGURAÇÕES E ESTADO
+        let db = { clientes: [], vendedores: [], transacoes: [] };
+        let currentUser = null;
+        let activeClientId = null;
+        let pollingInterval = null;
+
+        const API_BASE = 'api.php';
+
+        const formatCur = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+        // Função para buscar dados da API
+        const fetchData = async () => {
+            try {
+                const [clientesRes, vendedoresRes, transacoesRes] = await Promise.all([
+                    fetch(`${API_BASE}?action=getClientes`),
+                    fetch(`${API_BASE}?action=getVendedores`),
+                    fetch(`${API_BASE}?action=getTransacoes`)
+                ]);
+                db.clientes = await clientesRes.json();
+                db.vendedores = await vendedoresRes.json();
+                db.transacoes = await transacoesRes.json();
+                render();
+                if(activeClientId) updateClientDetailsDisplay(activeClientId);
+            } catch (error) {
+                console.error('Erro ao buscar dados:', error);
+            }
+        };
+
+        // Função para salvar dados via API
+        const salvar = async () => {
+            // Como estamos usando CSV, precisamos enviar cada mudança individualmente
+            // Para simplificar, vamos recarregar os dados após mudanças
+            await fetchData();
+        };
+
+        // Iniciar polling para atualizações em tempo real
+        const startPolling = () => {
+            if (pollingInterval) clearInterval(pollingInterval);
+            pollingInterval = setInterval(fetchData, 5000); // Atualizar a cada 5 segundos
+        };
+
+        const stopPolling = () => {
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+                pollingInterval = null;
+            }
+        };
+
+        // FUNÇÕES DE BACKUP (RESTITUÍDAS)
+        const exportarDados = () => {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", "backup_crm_vendas.json");
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+        };
+
+        const importarDados = (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const imported = JSON.parse(e.target.result);
+                    if (imported.clientes && imported.vendedores && imported.transacoes) {
+                        if (confirm("Isso substituirá todos os dados atuais. Deseja continuar?")) {
+                            db = imported;
+                            salvar();
+                            alert("Backup importado com sucesso!");
+                            location.reload();
+                        }
+                    } else {
+                        alert("Arquivo de backup inválido.");
+                    }
+                } catch (err) {
+                    alert("Erro ao ler o arquivo.");
+                }
+            };
+            reader.readAsText(file);
+        };
+
+        const render = () => {
+            const searchTerm = document.getElementById('search-cliente').value.toLowerCase();
+            const grid = document.getElementById('lista-clientes');
+            grid.innerHTML = '';
+            
+            const filtered = db.clientes.filter(c => c.nome.toLowerCase().includes(searchTerm) || (c.cpf && c.cpf.includes(searchTerm)));
+
+            filtered.forEach(c => {
+                const trs = db.transacoes.filter(t => t.cli_id == c.id);
+                const dividaCrediario = trs.filter(t => t.forma === 'V_CREDIARIO').reduce((acc, t) => acc + parseFloat(t.total), 0);
+                const recebido = trs.filter(t => t.tipo === 'RECEBIMENTO').reduce((acc, t) => acc + parseFloat(t.total), 0);
+                
+                const saldoCrediario = dividaCrediario - recebido;
+                const limite = parseFloat(c.limite);
+                const disponivel = limite - saldoCrediario;
+
+                grid.innerHTML += `
+                    <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 hover:shadow-xl transition-all">
+                        <div class="flex justify-between items-start mb-6">
+                            <div class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center font-black">${c.nome[0].toUpperCase()}</div>
+                            <div class="text-right">
+                                <p class="text-[9px] font-black text-slate-400 uppercase">Limite Disponível</p>
+                                <div class="font-black ${disponivel < 0 ? 'text-red-500' : 'text-emerald-600'}">${formatCur(disponivel)}</div>
+                            </div>
+                        </div>
+                        <h4 class="font-extrabold text-slate-800 uppercase text-sm truncate">${c.nome}</h4>
+                        <p class="text-[10px] text-slate-400 font-bold mt-1">Saldo Aberto (Crediário): ${formatCur(saldoCrediario)}</p>
+                        <button onclick="abrirFicha(${c.id})" class="w-full mt-6 bg-slate-800 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-black transition-all">Abrir Ficha</button>
+                    </div>
+                `;
+            });
+            
+            const gridVend = document.getElementById('grid-vendedores');
+            gridVend.innerHTML = db.vendedores.map(v => {
+                const podeExcluir = currentUser && currentUser.nivel === '1' && v.id !== currentUser.id;
+                return `
+                <div class="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm relative group overflow-hidden">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center font-black text-slate-500">${v.nome[0]}</div>
+                        <div class="flex-grow">
+                            <p class="font-bold text-slate-800 uppercase text-xs">${v.nome}</p>
+                            <p class="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Nível ${v.nivel}</p>
+                        </div>
+                        ${podeExcluir ? `
+                            <button onclick="excluirVendedor(${v.id})" class="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                  <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+                                  <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                                </svg>
+                            </button>
+                        ` : ''}
+                    </div>
+                </div>
+                `;
+            }).join('');
+
+            renderRelatorios();
+        };
+
+        const limparFiltroRelatorio = () => {
+            document.getElementById('filtro-data-inicio').value = '';
+            document.getElementById('filtro-data-fim').value = '';
+            renderRelatorios();
+        };
+
+        const renderRelatorios = () => {
+            const dataInicio = document.getElementById('filtro-data-inicio').value;
+            const dataFim = document.getElementById('filtro-data-fim').value;
+            
+            document.getElementById('txt-periodo-relatorio').innerText = (dataInicio && dataFim) 
+                ? `Exibindo de ${dataInicio.split('-').reverse().join('/')} até ${dataFim.split('-').reverse().join('/')}`
+                : "Exibindo: Todo o período";
+
+            const transacoesFiltradas = db.transacoes.filter(t => {
+                if (!dataInicio || !dataFim) return true;
+                return t.data >= dataInicio && t.data <= dataFim;
+            });
+
+            const sumForma = (forma) => transacoesFiltradas
+                .filter(t => t.tipo === 'VENDA' && t.forma === forma)
+                .reduce((acc, t) => acc + parseFloat(t.total), 0);
+
+            const vPix = sumForma('V_PIX');
+            const vDin = sumForma('V_DIN');
+            const vDeb = sumForma('V_DEB');
+            const vCre = sumForma('V_CRE');
+            const vCrediario = sumForma('V_CREDIARIO');
+            const recCrediario = transacoesFiltradas
+                .filter(t => t.tipo === 'RECEBIMENTO')
+                .reduce((acc, t) => acc + parseFloat(t.total), 0);
+
+            document.getElementById('rep-v-pix').innerText = formatCur(vPix);
+            document.getElementById('rep-v-din').innerText = formatCur(vDin);
+            document.getElementById('rep-v-deb').innerText = formatCur(vDeb);
+            document.getElementById('rep-v-cre').innerText = formatCur(vCre);
+            document.getElementById('rep-v-crediario').innerText = formatCur(vCrediario);
+            document.getElementById('rep-rec-crediario').innerText = formatCur(recCrediario);
+
+            const faturadoNoPeriodo = vPix + vDin + vDeb + vCre + vCrediario;
+            const recebidoAVistaNoPeriodo = vPix + vDin + vDeb + vCre;
+            const totalRecebidoNoPeriodo = recebidoAVistaNoPeriodo + recCrediario;
+            const saldoAbertoNoPeriodo = Math.max(0, vCrediario - recCrediario);
+
+            document.getElementById('rep-total-faturado').innerText = formatCur(faturadoNoPeriodo);
+            document.getElementById('rep-total-recebido').innerText = formatCur(totalRecebidoNoPeriodo);
+            document.getElementById('rep-total-saldo').innerText = formatCur(saldoAbertoNoPeriodo);
+
+            const rankVend = db.vendedores.map(v => {
+                const total = transacoesFiltradas.filter(t => t.v_id == v.id && t.tipo == 'VENDA').reduce((s,t) => s + parseFloat(t.total), 0);
+                return { ...v, total };
+            }).sort((a,b) => b.total - a.total);
+
+            document.getElementById('table-rank-vendedores').innerHTML = rankVend.map(v => `
+                <tr>
+                    <td class="p-6 font-bold text-slate-700">${v.nome}</td>
+                    <td class="p-6 text-right font-black text-emerald-600">${formatCur(v.total)}</td>
+                </tr>
+            `).join('');
+
+            const rankDev = db.clientes.map(c => {
+                const trs = db.transacoes.filter(t => t.cli_id == c.id);
+                const d = trs.filter(t => t.forma === 'V_CREDIARIO').reduce((acc, t) => acc + parseFloat(t.total), 0);
+                const r = trs.filter(t => t.tipo === 'RECEBIMENTO').reduce((acc, t) => acc + parseFloat(t.total), 0);
+                return { ...c, saldo: d - r };
+            }).filter(c => c.saldo > 0.01).sort((a,b) => b.saldo - a.saldo);
+
+            document.getElementById('table-rank-devedores').innerHTML = rankDev.map(c => `
+                <tr>
+                    <td class="p-6 font-bold text-slate-700">${c.nome}</td>
+                    <td class="p-6 text-right font-black text-red-500">${formatCur(c.saldo)}</td>
+                </tr>
+            `).join('');
+        };
+
+        const toggleFormMode = (val) => {
+            const vDiv = document.getElementById('campos-venda');
+            const rDiv = document.getElementById('campos-recebimento');
+            if(val === 'VENDA') {
+                vDiv.classList.remove('hidden');
+                rDiv.classList.add('hidden');
+                calcularTotal();
+            } else {
+                vDiv.classList.add('hidden');
+                rDiv.classList.remove('hidden');
+                const sel = document.getElementById('select-vendedor-recebimento');
+                sel.innerHTML = db.vendedores.map(v => `<option value="${v.id}" ${v.id == currentUser.id ? 'selected' : ''}>${v.nome}</option>`).join('');
+            }
+        };
+
+        const calcularTotal = () => {
+            const qtd = parseFloat(document.getElementById('field-qtd').value) || 0;
+            const unit = parseFloat(document.getElementById('field-v-unit').value) || 0;
+            const total = qtd * unit;
+            document.getElementById('txt-total-calculado').innerText = formatCur(total);
+        };
+
+        const updateClientDetailsDisplay = (id) => {
+            const c = db.clientes.find(x => x.id == id);
+            if(!c) return closeModal('modal-detalhes');
+
+            document.getElementById('det-nome-cli').innerText = c.nome;
+            document.getElementById('det-info-contato').innerText = `CPF/CNPJ: ${c.cpf || '-'} | TEL: ${c.telefone || '-'}`;
+
+            const trs = db.transacoes.filter(t => t.cli_id == id);
+            const dividaCrediario = trs.filter(t => t.forma === 'V_CREDIARIO').reduce((acc, t) => acc + parseFloat(t.total), 0);
+            const recebido = trs.filter(t => t.tipo === 'RECEBIMENTO').reduce((acc, t) => acc + parseFloat(t.total), 0);
+            
+            const saldoAberto = dividaCrediario - recebido;
+            const limite = parseFloat(c.limite);
+            const disp = limite - saldoAberto;
+            const perc = Math.min(100, Math.max(0, (saldoAberto / limite) * 100));
+
+            document.getElementById('txt-limite-percent').innerText = `${perc.toFixed(0)}%`;
+            document.getElementById('bar-limite').style.width = `${perc}%`;
+            document.getElementById('txt-limite-total').innerText = formatCur(limite);
+            document.getElementById('txt-limite-aberto').innerText = formatCur(saldoAberto);
+            document.getElementById('txt-limite-disponivel').innerText = formatCur(disp);
+
+            const tbody = document.getElementById('lista-extrato');
+            tbody.innerHTML = trs.sort((a,b) => new Date(b.data) - new Date(a.data)).map(t => {
+                const vNome = db.vendedores.find(v => v.id == t.v_id)?.nome || 'Sistema';
+                const formaTxt = {
+                    'V_PIX': 'PIX', 'V_DIN': 'DINHEIRO', 'V_DEB': 'DÉBITO', 
+                    'V_CRE': 'CRÉDITO', 'V_CREDIARIO': 'CREDIÁRIO', 'REC': 'RECEB.'
+                }[t.forma || 'REC'];
+
+                const isVendaVista = t.tipo === 'VENDA' && t.forma !== 'V_CREDIARIO';
+                const acoes = `<button onclick="deletarTransacao(${t.id})" class="bg-red-50 text-red-600 px-3 py-1 rounded text-[9px] font-black uppercase hover:bg-red-100 transition-all">Limpar</button>`;
+
+                return `
+                    <tr class="${t.tipo == 'RECEBIMENTO' ? 'bg-emerald-50/30' : ''}">
+                        <td class="p-5 text-[10px] font-mono text-slate-400">${t.data}</td>
+                        <td class="p-5">
+                            <span class="font-bold text-slate-700 block">${t.desc}</span>
+                            <span class="text-[9px] font-black uppercase ${t.forma === 'V_CREDIARIO' ? 'text-red-600 bg-red-50' : 'text-slate-400 bg-slate-100'} px-2 py-0.5 rounded">${formaTxt}</span>
+                        </td>
+                        <td class="p-5 text-xs font-bold text-slate-500 uppercase">${vNome}</td>
+                        <td class="p-5 text-right font-black ${isVendaVista ? 'text-emerald-600' : t.tipo == 'VENDA' ? 'text-red-500' : 'text-emerald-600'}">
+                            ${isVendaVista ? '+' : t.tipo == 'VENDA' ? '-' : '+'} ${formatCur(t.total)}
+                        </td>
+                        <td class="p-5 text-center">
+                            ${acoes}
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        };
+
+        const imprimirTransacoesCliente = () => {
+            const c = db.clientes.find(x => x.id == activeClientId);
+            if(!c) return;
+
+            const trs = db.transacoes.filter(t => t.cli_id == activeClientId);
+            
+            // Criar conteúdo HTML para impressão
+            const printContent = `
+                <!DOCTYPE html>
+                <html lang="pt-pt">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>Relatório de Transações - ${c.nome}</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; margin: 15px; }
+                        .header { background-color: #1e293b; color: white; padding: 15px; margin: -15px -15px 15px -15px; }
+                        .header h1 { margin: 0; font-size: 20px; }
+                        .header p { margin: 3px 0; font-size: 12px; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 12px; }
+                        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                        th { background-color: #f8fafc; font-weight: bold; font-size: 11px; }
+                        .valor { text-align: right; font-weight: bold; }
+                        .valor.entrada { color: #059669; }
+                        .valor.saida { color: #dc2626; }
+                        .total { background-color: #f1f5f9; font-weight: bold; }
+                        @media print { 
+                            body { margin: 0; font-size: 12px; }
+                            .header { padding: 10px; }
+                            table { font-size: 11px; }
+                            th, td { padding: 6px; }
+                        }
+                        @media (max-width: 768px) {
+                            body { margin: 10px; }
+                            .header { padding: 10px; }
+                            .header h1 { font-size: 18px; }
+                            table { font-size: 11px; }
+                            th, td { padding: 6px; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <h1>RELATÓRIO DE TRANSAÇÕES</h1>
+                        <p><strong>Cliente:</strong> ${c.nome}</p>
+                        <p><strong>CPF/CNPJ:</strong> ${c.cpf || '-'}</p>
+                        <p><strong>Telefone:</strong> ${c.telefone || '-'}</p>
+                        <p><strong>Endereço:</strong> ${c.endereco || '-'}</p>
+                        <p><strong>Referência:</strong> ${c.referencia || '-'}</p>
+                        <p><strong>Limite de Crédito:</strong> R$ ${c.limite}</p>
+                        <p><strong>Data de Emissão:</strong> ${new Date().toLocaleDateString('pt-BR')}</p>
+                    </div>
+                    
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Descrição</th>
+                                <th>Forma de Pagamento</th>
+                                <th>Vendedor</th>
+                                <th>Valor</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${trs.sort((a,b) => new Date(b.data) - new Date(a.data)).map(t => {
+                                const vNome = db.vendedores.find(v => v.id == t.v_id)?.nome || 'Sistema';
+                                const formaTxt = {
+                                    'V_PIX': 'PIX', 'V_DIN': 'Dinheiro', 'V_DEB': 'Débito', 
+                                    'V_CRE': 'Crédito', 'V_CREDIARIO': 'Crediário', 'REC': 'Recebimento'
+                                }[t.forma || 'REC'];
+                                
+                                const isEntrada = t.tipo === 'RECEBIMENTO' || (t.tipo === 'VENDA' && t.forma !== 'V_CREDIARIO');
+                                const valorClass = isEntrada ? 'valor entrada' : 'valor saida';
+                                const sinal = isEntrada ? '+' : '-';
+                                
+                                return `
+                                    <tr>
+                                        <td>${t.data}</td>
+                                        <td>${t.desc || t.item || 'Lançamento'}</td>
+                                        <td>${formaTxt}</td>
+                                        <td>${vNome}</td>
+                                        <td class="${valorClass}">${sinal} R$ ${parseFloat(t.total).toFixed(2)}</td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </body>
+                </html>
+            `;
+
+            // Tentar abrir nova aba para impressão (compatível com mobile)
+            let printWindow;
+            try {
+                printWindow = window.open('', '_blank');
+                if (!printWindow) {
+                    // Fallback: tentar abrir sem especificar target
+                    printWindow = window.open('');
+                }
+            } catch (e) {
+                // Fallback para mobile: usar data URL
+                try {
+                    const dataUrl = 'data:text/html;charset=utf-8,' + encodeURIComponent(printContent);
+                    const link = document.createElement('a');
+                    link.href = dataUrl;
+                    link.download = `relatorio-${c.nome.replace(/\s+/g, '-').toLowerCase()}.html`;
+                    link.target = '_blank';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    alert('Arquivo de impressão baixado. Abra o arquivo e use a função de impressão do seu navegador.');
+                    return;
+                } catch (fallbackError) {
+                    alert('Erro ao abrir janela de impressão. Tente novamente ou use um navegador desktop.');
+                    return;
+                }
+            }
+
+            if (!printWindow) {
+                // Último fallback: data URL
+                try {
+                    const dataUrl = 'data:text/html;charset=utf-8,' + encodeURIComponent(printContent);
+                    window.location.href = dataUrl;
+                    alert('Abrindo relatório em nova aba. Use Ctrl+P para imprimir.');
+                    return;
+                } catch (e) {
+                    alert('Não foi possível abrir a impressão. Verifique se o bloqueador de popups está desativado.');
+                    return;
+                }
+            }
+
+            printWindow.document.write(printContent);
+            printWindow.document.close();
+            printWindow.focus();
+            
+            // Aguardar carregamento e imprimir
+            printWindow.onload = () => {
+                // Pequeno delay para garantir que o conteúdo esteja totalmente carregado
+                setTimeout(() => {
+                    try {
+                        printWindow.print();
+                        // Não fechar automaticamente em mobile para dar tempo ao usuário
+                        if (!/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+                            printWindow.close();
+                        }
+                    } catch (e) {
+                        alert('Erro ao imprimir. Use Ctrl+P (ou Cmd+P no Mac) para imprimir manualmente.');
+                    }
+                }, 500);
+            };
+        };
+
+        const openModal = (m) => document.getElementById(m).classList.remove('hidden');
+        const closeModal = (m) => {
+            document.getElementById(m).classList.add('hidden');
+            if(m === 'modal-detalhes') activeClientId = null;
+        };
+
+        const abrirFicha = (id) => {
+            activeClientId = id;
+            document.getElementById('form-movimentacao').reset();
+            updateClientDetailsDisplay(id);
+            openModal('modal-detalhes');
+        };
+
+        // LOGIN
+        document.getElementById('form-login').onsubmit = async (e) => {
+            e.preventDefault();
+            await fetchData();
+            const selectedId = document.getElementById('login-vendedor').value;
+            const passwordInput = document.getElementById('login-senha').value;
+            const user = db.vendedores.find(v => v.id == selectedId);
+            
+            if(user && user.senha === passwordInput) {
+                currentUser = user;
+                document.getElementById('login-screen').classList.add('hidden');
+                document.getElementById('app').classList.remove('hidden');
+                document.getElementById('user-logged-name').innerText = user.nome;
+                document.getElementById('user-logged-level').innerText = `Hierarquia: Nível ${user.nivel}`;
+                startPolling();
+                render();
+            } else {
+                document.getElementById('login-error').classList.remove('hidden');
+            }
+        };
+
+        document.getElementById('form-movimentacao').onsubmit = async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const tipoGeral = formData.get('tipo_geral');
+            const cliente = db.clientes.find(c => c.id == activeClientId);
+            
+            let novaTransacao = {
+                cli_id: activeClientId,
+                data: formData.get('data')
+            };
+
+            if(tipoGeral === 'VENDA') {
+                const qtd = parseFloat(formData.get('qtd')) || 1;
+                const unit = parseFloat(formData.get('v_unit')) || 0;
+                const total = qtd * unit;
+                const forma = formData.get('forma_venda');
+                if(total <= 0) {
+                    alert('Total da venda deve ser maior que zero.');
+                    return;
+                }
+
+                if(forma === 'V_CREDIARIO') {
+                    const trs = db.transacoes.filter(t => t.cli_id == activeClientId);
+                    const d = trs.filter(t => t.forma === 'V_CREDIARIO').reduce((acc, t) => acc + parseFloat(t.total), 0);
+                    const r = trs.filter(t => t.tipo === 'RECEBIMENTO').reduce((acc, t) => acc + parseFloat(t.total), 0);
+                    const saldoAtual = d - r;
+                    const disponivel = parseFloat(cliente.limite) - saldoAtual;
+
+                    if(total > disponivel) {
+                        alert(`Venda Bloqueada: Cliente possui apenas ${formatCur(disponivel)} de limite disponível.`);
+                        return;
+                    }
+                }
+
+                novaTransacao = {
+                    ...novaTransacao,
+                    tipo: 'VENDA',
+                    forma: forma,
+                    total: total,
+                    desc: `${formData.get('item').toUpperCase()} (${qtd}x)`,
+                    v_id: currentUser.id
+                };
+            } else {
+                const valor = parseFloat(formData.get('rec_valor')) || 0;
+                if(valor <= 0) return;
+
+                novaTransacao = {
+                    ...novaTransacao,
+                    tipo: 'RECEBIMENTO',
+                    forma: 'REC',
+                    total: valor,
+                    desc: `RECEBIMENTO: ${formData.get('rec_referencia').toUpperCase() || 'QUITAÇÃO'}`,
+                    v_id: parseInt(formData.get('rec_vendedor'))
+                };
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}?action=addTransacao`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(novaTransacao)
+                });
+                if (response.ok) {
+                    await fetchData();
+                    e.target.reset();
+                    document.querySelectorAll('.data-hoje').forEach(i => i.value = new Date().toISOString().split('T')[0]);
+                    toggleFormMode('VENDA');
+                    calcularTotal();
+                } else {
+                    alert('Erro ao salvar transação');
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+            }
+        };
+
+        const prepareCreateClient = () => {
+            document.getElementById('modal-cliente-title').innerText = "Novo Cliente";
+            document.getElementById('form-cliente').reset();
+            document.getElementById('edit-client-id').value = "";
+            document.getElementById('btn-excluir-cliente').classList.add('hidden');
+            applyPermissionsToForm(true);
+            openModal('modal-cliente');
+        };
+
+        const prepareEditClientFromDetails = () => {
+            const c = db.clientes.find(x => x.id == activeClientId);
+            if(!c) return;
+            document.getElementById('modal-cliente-title').innerText = "Editar Cadastro";
+            document.getElementById('edit-client-id').value = c.id;
+            document.getElementById('edit-client-nome').value = c.nome;
+            document.getElementById('edit-client-cpf').value = c.cpf || '';
+            document.getElementById('edit-client-telefone').value = c.telefone || '';
+            document.getElementById('edit-client-endereco').value = c.endereco || '';
+            document.getElementById('edit-client-referencia').value = c.referencia || '';
+            document.getElementById('edit-client-limite').value = c.limite;
+            
+            const btnExcluir = document.getElementById('btn-excluir-cliente');
+            if(currentUser.nivel === '1') btnExcluir.classList.remove('hidden');
+            else btnExcluir.classList.add('hidden');
+
+            applyPermissionsToForm(false);
+            openModal('modal-cliente');
+        };
+
+        const applyPermissionsToForm = (isNew = false) => {
+            const lvl1Fields = document.querySelectorAll('.field-lvl-1');
+            const lvl2Fields = document.querySelectorAll('.field-lvl-2');
+            const btnSalvar = document.getElementById('btn-salvar-cliente');
+
+            if(currentUser.nivel === '1') {
+                lvl1Fields.forEach(f => f.disabled = false);
+                lvl2Fields.forEach(f => f.disabled = false);
+                btnSalvar.classList.remove('hidden');
+            } else if(currentUser.nivel === '2') {
+                if (isNew) {
+                    lvl1Fields.forEach(f => f.disabled = false);
+                    lvl2Fields.forEach(f => f.disabled = false);
+                } else {
+                    lvl1Fields.forEach(f => f.disabled = true);
+                    lvl2Fields.forEach(f => f.disabled = false);
+                }
+                btnSalvar.classList.remove('hidden');
+            } else {
+                if (isNew) {
+                    lvl1Fields.forEach(f => f.disabled = false);
+                    lvl2Fields.forEach(f => f.disabled = false);
+                    btnSalvar.classList.remove('hidden');
+                } else {
+                    lvl1Fields.forEach(f => f.disabled = true);
+                    lvl2Fields.forEach(f => f.disabled = true);
+                    btnSalvar.classList.add('hidden');
+                }
+            }
+        };
+
+        document.getElementById('btn-excluir-cliente').onclick = async () => {
+            if(currentUser.nivel !== '1') return;
+            const id = document.getElementById('edit-client-id').value;
+            if(!confirm("Remover este cliente permanentemente?")) return;
+            try {
+                const response = await fetch(`${API_BASE}?action=deleteCliente`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: id })
+                });
+                if (response.ok) {
+                    await fetchData();
+                    closeModal('modal-cliente');
+                    closeModal('modal-detalhes');
+                } else {
+                    alert('Erro ao excluir cliente');
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+            }
+        };
+
+        const excluirVendedor = async (id) => {
+            if(!currentUser || currentUser.nivel !== '1') return;
+            if(id === currentUser.id) return;
+            if(!confirm("Excluir vendedor?")) return;
+            try {
+                const response = await fetch(`${API_BASE}?action=deleteVendedor`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: id })
+                });
+                if (response.ok) {
+                    await fetchData();
+                    carregarLogins();
+                } else {
+                    alert('Erro ao excluir vendedor');
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+            }
+        };
+
+        const deletarTransacao = async (id) => {
+            if(!confirm("Tem certeza que deseja remover esta transação?")) return;
+            try {
+                const response = await fetch(`${API_BASE}?action=deleteTransacao`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: id })
+                });
+                if (response.ok) {
+                    await fetchData();
+                    if(activeClientId) updateClientDetailsDisplay(activeClientId);
+                } else {
+                    alert('Erro ao limpar venda');
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+            }
+        };
+
+        document.getElementById('form-vendedor').onsubmit = async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData);
+            try {
+                const response = await fetch(`${API_BASE}?action=addVendedor`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                if (response.ok) {
+                    await fetchData();
+                    closeModal('modal-vendedor'); e.target.reset(); carregarLogins();
+                } else {
+                    alert('Erro ao salvar vendedor');
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+            }
+        };
+
+        const openChangePasswordModal = () => {
+            if(!currentUser) return;
+            document.getElementById('form-change-password').reset();
+            const errorBox = document.getElementById('change-password-error');
+            errorBox.classList.add('hidden');
+            errorBox.innerText = '';
+            openModal('modal-senha');
+        };
+
+        document.getElementById('form-change-password').onsubmit = async (e) => {
+            e.preventDefault();
+            if(!currentUser) return;
+            const formData = new FormData(e.target);
+            const { current_senha, new_senha, confirm_senha } = Object.fromEntries(formData);
+            const errorBox = document.getElementById('change-password-error');
+            errorBox.classList.add('hidden');
+            errorBox.innerText = '';
+
+            if(current_senha !== currentUser.senha) {
+                errorBox.innerText = 'Senha atual incorreta.';
+                errorBox.classList.remove('hidden');
+                return;
+            }
+            if(new_senha.length < 3) {
+                errorBox.innerText = 'A nova senha precisa ter pelo menos 3 caracteres.';
+                errorBox.classList.remove('hidden');
+                return;
+            }
+            if(new_senha !== confirm_senha) {
+                errorBox.innerText = 'A confirmação da nova senha não coincide.';
+                errorBox.classList.remove('hidden');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}?action=updateVendedor`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: currentUser.id, senha: new_senha })
+                });
+                if (response.ok) {
+                    currentUser.senha = new_senha;
+                    await fetchData();
+                    closeModal('modal-senha');
+                    alert('Senha alterada com sucesso!');
+                } else {
+                    errorBox.innerText = 'Erro ao alterar senha.';
+                    errorBox.classList.remove('hidden');
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+            }
+        };
+
+        document.getElementById('form-cliente').onsubmit = async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData);
+            const action = data.id ? 'updateCliente' : 'addCliente';
+            try {
+                const response = await fetch(`${API_BASE}?action=${action}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                if (response.ok) {
+                    await fetchData();
+                    closeModal('modal-cliente');
+                } else {
+                    alert('Erro ao salvar cliente');
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+            }
+        };
+
+        const carregarLogins = async () => {
+            await fetchData();
+            const select = document.getElementById('login-vendedor');
+            select.innerHTML = db.vendedores.map(v => `<option value="${v.id}">${v.nome}</option>`).join('');
+        };
+
+        const logout = () => {
+            stopPolling();
+            location.reload();
+        };
+        
+        const switchTab = (t) => {
+            document.querySelectorAll('.tab-content').forEach(s => s.classList.add('hidden'));
+            document.querySelectorAll('nav button').forEach(b => b.classList.remove('tab-active'));
+            document.getElementById(`section-${t}`).classList.remove('hidden');
+            document.getElementById(`tab-${t}`).classList.add('tab-active');
+            if(t === 'relatorios') renderRelatorios();
+        };
+
+        window.onload = async () => {
+            await carregarLogins();
+            const hoje = new Date().toISOString().split('T')[0];
+            document.querySelectorAll('.data-hoje').forEach(i => i.value = hoje);
+        };
+    </script>
+</body>
+</html>
