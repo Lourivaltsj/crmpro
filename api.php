@@ -62,11 +62,15 @@ $action = $_GET['action'] ?? '';
 // --- ROTEAMENTO ---
 switch ($action) {
     case 'getClientes':
-        echo json_encode(readCSV($files['clientes']));
+        $data = readCSV($files['clientes']);
+        error_log("getClientes: " . count($data) . " registros encontrados");
+        echo json_encode($data);
         break;
 
     case 'getVendedores':
-        echo json_encode(readCSV($files['vendedores']));
+        $data = readCSV($files['vendedores']);
+        error_log("getVendedores: " . count($data) . " registros encontrados");
+        echo json_encode($data);
         break;
 
     case 'getTransacoes':

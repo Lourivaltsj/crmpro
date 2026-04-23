@@ -424,25 +424,94 @@
         let activeClientId = null;
         let pollingInterval = null;
 
-        const API_BASE = 'api.php';
+        // Tentar diferentes caminhos para a API (para hospedagem)
+        const getApiBase = () => {
+            const possiblePaths = [
+                'api.php',
+                './api.php',
+                '/api.php',
+                window.location.origin + '/api.php',
+                window.location.pathname.replace(/\/[^\/]*$/, '/api.php')
+            ];
+            
+            // Retornar o primeiro que provavelmente funcione
+            return possiblePaths[0];
+        };
+
+        const API_BASE = getApiBase();
 
         const formatCur = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+        // Função para testar conectividade da API
+        const testApiConnection = async () => {
+            try {
+                console.log('Testando conexão com API:', API_BASE);
+                const response = await fetch(`${API_BASE}?action=getVendedores`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    console.log('API conectada com sucesso');
+                    return true;
+                } else {
+                    console.error('Erro na resposta da API:', response.status, response.statusText);
+                    return false;
+                }
+            } catch (error) {
+                console.error('Erro ao conectar com API:', error);
+                return false;
+            }
+        };
 
         // Função para buscar dados da API
         const fetchData = async () => {
             try {
+                console.log('Tentando buscar dados da API...');
+                
+                // Testar conexão primeiro
+                const isConnected = await testApiConnection();
+                if (!isConnected) {
+                    console.error('Falha na conexão com API');
+                    alert('Não foi possível conectar com o servidor. Verifique se:\n1. O arquivo api.php está no mesmo diretório\n2. O servidor suporta PHP\n3. Não há bloqueio de CORS');
+                    return;
+                }
+                
                 const [clientesRes, vendedoresRes, transacoesRes] = await Promise.all([
                     fetch(`${API_BASE}?action=getClientes`),
                     fetch(`${API_BASE}?action=getVendedores`),
                     fetch(`${API_BASE}?action=getTransacoes`)
                 ]);
+                
+                console.log('Respostas recebidas:', { 
+                    clientes: clientesRes.status, 
+                    vendedores: vendedoresRes.status, 
+                    transacoes: transacoesRes.status 
+                });
+                
+                if (!clientesRes.ok || !vendedoresRes.ok || !transacoesRes.ok) {
+                    console.error('Erro nas respostas da API');
+                    alert('Erro ao carregar dados do servidor. Verifique os logs do console (F12) para mais detalhes.');
+                    return;
+                }
+                
                 db.clientes = await clientesRes.json();
                 db.vendedores = await vendedoresRes.json();
                 db.transacoes = await transacoesRes.json();
+                
+                console.log('Dados carregados:', {
+                    clientes: db.clientes.length,
+                    vendedores: db.vendedores.length,
+                    transacoes: db.transacoes.length
+                });
+                
                 render();
                 if(activeClientId) updateClientDetailsDisplay(activeClientId);
             } catch (error) {
                 console.error('Erro ao buscar dados:', error);
+                alert('Erro ao conectar com o servidor. Verifique se o arquivo api.php está acessível e se o servidor suporta PHP.');
             }
         };
 
@@ -1191,9 +1260,17 @@
         };
 
         const carregarLogins = async () => {
+            console.log('Carregando logins...');
             await fetchData();
+            console.log('Vendedores disponíveis:', db.vendedores);
             const select = document.getElementById('login-vendedor');
-            select.innerHTML = db.vendedores.map(v => `<option value="${v.id}">${v.nome}</option>`).join('');
+            if (db.vendedores && db.vendedores.length > 0) {
+                select.innerHTML = db.vendedores.map(v => `<option value="${v.id}">${v.nome}</option>`).join('');
+                console.log('Logins carregados com sucesso');
+            } else {
+                console.error('Nenhum vendedor encontrado');
+                select.innerHTML = '<option value="">Nenhum usuário disponível</option>';
+            }
         };
 
         const logout = () => {
